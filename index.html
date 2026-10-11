@@ -336,11 +336,22 @@ td img{width:46px;height:46px;object-fit:cover;border-radius:5px}
 <!-- Login -->
 <div class="ov" id="loginOv"><div class="modal sm" id="loginBox">
   <button class="x" data-close="loginOv">✕</button>
-  <h2 style="margin-bottom:6px">Admin-Anmeldung</h2>
+  <h2 id="lTitle" style="margin-bottom:6px">Admin-Anmeldung</h2>
+  <p id="lMsg" class="note" style="display:none"></p>
   <p id="loginHint" style="font-size:13px;color:var(--muted);margin-bottom:14px">Standard: <b>admin</b> / <b>admin123</b> (bitte danach ändern!)</p>
+  <div class="f" id="lNameBox" style="display:none"><label>Dein Name</label><input id="lName" autocomplete="name" maxlength="60"></div>
   <div class="f"><label id="lUserLbl">Benutzername</label><input id="lUser" autocomplete="username"></div>
   <div class="f"><label>Passwort</label><input id="lPass" type="password" autocomplete="current-password"></div>
   <button class="btn" style="width:100%" id="doLogin">Anmelden</button>
+  <div id="lSwitch" style="display:none;font-size:13px;margin-top:14px;text-align:center"><a href="#" id="lToggle">Neu hier? Konto erstellen</a><br><a href="#" id="lForgot" style="color:var(--muted)">Passwort vergessen?</a></div>
+</div></div>
+
+<!-- Konto (Kunde) -->
+<div class="ov" id="accOv"><div class="modal sm">
+  <button class="x" data-close="accOv">✕</button>
+  <h2 style="margin-bottom:6px">👤 Mein Konto</h2>
+  <p id="accInfo" style="margin-bottom:16px;font-size:14px;line-height:1.5"></p>
+  <button class="btn dark" style="width:100%" id="accLogout">Abmelden</button>
 </div></div>
 
 <!-- Admin Panel -->
@@ -479,9 +490,47 @@ async function dbReplaceAll(list){
   list.forEach(p=>ops.push(b=>b.set(fs.doc(db,'products',String(p.id)),pdata(p))));
   for(let i=0;i<ops.length;i+=400){const b=fs.writeBatch(db);ops.slice(i,i+400).forEach(o=>o(b));await b.commit()}
 }
+/* ---- Anmeldung / Registrierung ---- */
+let user=null, pendingCheckout=false, openAdminAfter=false, authMode='in';
+const AUTH_ERR={'auth/invalid-credential':'E-Mail oder Passwort falsch','auth/wrong-password':'E-Mail oder Passwort falsch','auth/user-not-found':'E-Mail oder Passwort falsch','auth/invalid-login-credentials':'E-Mail oder Passwort falsch','auth/email-already-in-use':'Diese E-Mail ist schon registriert – bitte anmelden','auth/weak-password':'Passwort zu schwach (mind. 6 Zeichen)','auth/invalid-email':'Ungültige E-Mail-Adresse','auth/too-many-requests':'Zu viele Versuche – bitte später erneut probieren','auth/network-request-failed':'Keine Internetverbindung','auth/operation-not-allowed':'E-Mail/Passwort-Login ist in Firebase nicht aktiviert'};
+const shake=el=>{el.classList.remove('shake');void el.offsetWidth;el.classList.add('shake')};
+function setAuthMode(m){
+  authMode=m;const reg=m==='up';
+  $('#lTitle').textContent=reg?'Konto erstellen':'Anmelden';
+  $('#doLogin').textContent=reg?'Registrieren':'Anmelden';
+  $('#lNameBox').style.display=reg?'':'none';
+  $('#lToggle').textContent=reg?'Schon ein Konto? Anmelden':'Neu hier? Konto erstellen';
+  $('#lPass').autocomplete=reg?'new-password':'current-password';
+}
+function showLogin(mode,msg){
+  if(CLOUD)setAuthMode(mode||'in');
+  $('#lMsg').textContent=msg||'';$('#lMsg').style.display=msg?'':'none';
+  $('#lUser').value='';$('#lPass').value='';$('#lName').value='';
+  open('loginOv');setTimeout(()=>$(CLOUD&&authMode==='up'?'#lName':'#lUser').focus(),100);
+}
 async function cloudLogin(){
-  try{await au.signInWithEmailAndPassword(auth,$('#lUser').value.trim(),$('#lPass').value);close('loginOv');renderAdminRows();open('adminOv');toast('👋 Willkommen, Admin!');confetti()}
-  catch(e){const b=$('#loginBox');b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');toast('❌ Login fehlgeschlagen')}
+  const email=$('#lUser').value.trim(),pw=$('#lPass').value,reg=authMode==='up',name=$('#lName').value.trim();
+  const bad=m=>{shake($('#loginBox'));toast('⚠️ '+m)};
+  if(!email||!pw)return bad('Bitte E-Mail und Passwort eingeben');
+  if(reg&&name.length<2)return bad('Bitte deinen Namen eingeben');
+  if(reg&&pw.length<6)return bad('Passwort: mindestens 6 Zeichen');
+  const btn=$('#doLogin');btn.disabled=true;
+  try{
+    if(reg){const cr=await au.createUserWithEmailAndPassword(auth,email,pw);try{await au.updateProfile(cr.user,{displayName:name})}catch(e){}}
+    else{openAdminAfter=!pendingCheckout;await au.signInWithEmailAndPassword(auth,email,pw)}
+    close('loginOv');setAdminUI();
+    if(pendingCheckout){pendingCheckout=false;toast('✅ Angemeldet – weiter zur Kasse');setTimeout(showCheckout,300)}
+    else toast(reg?'🎉 Konto erstellt – willkommen!':'👋 Willkommen zurück!');
+  }catch(e){
+    console.error(e);openAdminAfter=false;
+    bad(AUTH_ERR[e&&e.code]||('Fehler: '+((e&&e.message)||e)));
+  }finally{btn.disabled=false}
+}
+async function forgotPw(){
+  const email=$('#lUser').value.trim();
+  if(!email){toast('⚠️ Bitte zuerst deine E-Mail eingeben');$('#lUser').focus();return}
+  try{await au.sendPasswordResetEmail(auth,email)}catch(e){if(e&&(e.code==='auth/invalid-email'||e.code==='auth/network-request-failed')){toast('⚠️ '+AUTH_ERR[e.code]);return}}
+  toast('📧 Falls ein Konto existiert, wurde eine E-Mail zum Zurücksetzen gesendet');
 }
 const saveCart=()=>LS.set('mejt_cart',cart);
 const saveWish=()=>LS.set('mejt_wish',wish);
@@ -582,7 +631,7 @@ function showDetail(id){
 }
 
 /* ============ Admin ============ */
-function setAdminUI(){$('#adminbar').classList.toggle('on',admin);$('#accLabel').textContent=admin?'Admin ⚙️':'Anmelden';$$('.adminOnly').forEach(e=>e.style.display=admin?'':'none')}
+function setAdminUI(){$('#adminbar').classList.toggle('on',admin);const cu=CLOUD&&auth?auth.currentUser:null;$('#accLabel').textContent=admin?'Admin ⚙️':cu?((cu.displayName||cu.email||'Konto').split(/[ @]/)[0]):'Anmelden';$$('.adminOnly').forEach(e=>e.style.display=admin?'':'none')}
 function renderAdminRows(){
   $('#aRows').innerHTML=products.map((p,i)=>`<tr style="animation-delay:${i*.03}s"><td><img src="${esc(safeUrl(p.images[0]))}" onerror="this.src='${FALLBACK}'"></td><td>${esc(p.name)}</td><td>${esc(p.cat)}</td><td>${eur(p.price)}</td><td>${p.stock}</td><td style="white-space:nowrap"><button class="btn sm2" data-act="aedit" data-id="${p.id}">✏️</button> <button class="btn red sm2" data-act="adel" data-id="${p.id}">🗑</button></td></tr>`).join('')||'<tr><td colspan="6">Keine Produkte</td></tr>';
 }
@@ -640,8 +689,16 @@ function watchOrders(on){
     if(!ordFirst)snap.docChanges().forEach(ch=>{if(ch.type==='added'&&!ch.doc.metadata.hasPendingWrites)toast('🔔 Neue Bestellung eingegangen!')});
     ordFirst=false;
     orders=snap.docs.map(d=>({...d.data(),id:d.id}));
+    // Lesen erlaubt => dieser Nutzer ist laut Firestore-Regeln der Admin
+    if(!admin){admin=true;setAdminUI();if(openAdminAfter){openAdminAfter=false;renderAdminRows();open('adminOv');toast('👋 Willkommen, Admin!');confetti()}}
     renderOrders();
-  },err=>{console.error(err);toast('⚠️ Bestellungen laden fehlgeschlagen: '+(err.code||err.message))});
+  },err=>{
+    openAdminAfter=false;
+    if(admin){admin=false;setAdminUI();close('adminOv')}
+    orders=[];renderOrders();
+    // permission-denied = normaler Kunde (kein Admin) -> keine Fehlermeldung
+    if(err&&err.code!=='permission-denied'){console.error(err);toast('⚠️ Bestellungen laden fehlgeschlagen: '+(err.code||err.message))}
+  });
 }
 function renderOrders(){
   const n=openOrderCount();
@@ -703,7 +760,9 @@ $('#ordBtn').onclick=()=>{renderAdminRows();tab('aOrders');renderOrders();open('
 function cartItems(){return Object.keys(cart).map(id=>{const p=products.find(x=>x.id==id);return p?{p,q:cart[id]}:null}).filter(Boolean)}
 function showCheckout(){
   const its=cartItems();if(!its.length){toast('Warenkorb ist leer');return}
-  const tot=its.reduce((a,{p,q})=>a+p.price*q,0),sv=LS.get('mejt_addr',{});
+  if(CLOUD&&!auth.currentUser){pendingCheckout=true;showLogin('in','🔒 Zum Bestellen musst du angemeldet sein. Melde dich an oder erstelle kurz ein Konto.');return}
+  const cu=CLOUD?auth.currentUser:null,addrKey='mejt_addr'+(cu?'_'+cu.uid:'');
+  const tot=its.reduce((a,{p,q})=>a+p.price*q,0),sv=LS.get(addrKey,{});
   $('#coBox').innerHTML=`<button class="x" data-close="coOv">✕</button>
   <form id="coForm" class="chk" novalidate>
     <div>
@@ -724,6 +783,7 @@ function showCheckout(){
     </div>
   </form>`;
   [['cName','name'],['cStreet','street'],['cZip','zip'],['cCity','city'],['cMail','email'],['cTel','phone']].forEach(([i,k])=>{$('#'+i).value=sv[k]||''});
+  if(cu){if(!$('#cName').value)$('#cName').value=cu.displayName||'';if(!$('#cMail').value)$('#cMail').value=cu.email||''}
   $('#coForm').onsubmit=async e=>{
     e.preventDefault();
     const v=id=>$('#'+id).value.trim();
@@ -737,16 +797,17 @@ function showCheckout(){
     if(!$('#cOk').checked)return bad('cOk','Bitte der Speicherung deiner Angaben zustimmen');
     const cur=cartItems();
     if(!cur.length){toast('Warenkorb ist leer');close('coOv');return}
+    if(CLOUD&&!auth.currentUser){close('coOv');pendingCheckout=true;showLogin('in','🔒 Deine Sitzung ist abgelaufen – bitte erneut anmelden.');return}
     const over=cur.find(({p,q})=>q>p.stock);
     if(over){toast(`⚠️ „${over.p.name}" ist nicht mehr in dieser Menge verfügbar`);return}
     const total=+cur.reduce((a,{p,q})=>a+p.price*q,0).toFixed(2);
     const order={orderNo:'MEJT-'+Date.now().toString(36).toUpperCase().slice(-5)+Math.random().toString(36).slice(2,5).toUpperCase(),
       items:cur.map(({p,q})=>({id:String(p.id),name:p.name,price:p.price,qty:q,image:p.images[0]||''})),
-      total,customer:cust,status:'open',createdAt:Date.now(),pay:'Bezahlung bei Lieferung'};
+      total,customer:cust,status:'open',createdAt:Date.now(),pay:'Bezahlung bei Lieferung',...(CLOUD?{uid:auth.currentUser.uid}:{})};
     const btn=$('#cSubmit');btn.disabled=true;btn.textContent='Wird gesendet …';
     try{
       await createOrder(order);
-      LS.set('mejt_addr',{name:cust.name,street:cust.street,zip:cust.zip,city:cust.city,email:cust.email,phone:cust.phone});
+      LS.set(addrKey,{name:cust.name,street:cust.street,zip:cust.zip,city:cust.city,email:cust.email,phone:cust.phone});
       cart={};saveCart();updateBadges();renderCart();showOrderDone(order);confetti();
     }catch(err){
       console.error(err);btn.disabled=false;btn.textContent='Jetzt verbindlich bestellen';
@@ -763,9 +824,16 @@ function showOrderDone(o){
     <div class="sum" style="text-align:left;max-width:420px;margin:16px auto"><div style="display:block"><b>Lieferung an:</b><br>${esc(c.name)}<br>${esc(c.street)}<br>${esc(c.zip)} ${esc(c.city)}</div><hr style="margin:8px 0;border:none;border-top:1px solid #ddd"><div><span>Gesamt (Bezahlung bei Lieferung)</span><b>${eur(o.total)}</b></div></div>
     <button class="btn o" data-close="coOv">Weiter einkaufen</button></div>`;
 }
-$('#accBtn').onclick=()=>{if(admin){renderAdminRows();open('adminOv')}else{$('#lUser').value='';$('#lPass').value='';open('loginOv');setTimeout(()=>$('#lUser').focus(),100)}};
+$('#accBtn').onclick=()=>{
+  if(admin){renderAdminRows();open('adminOv');return}
+  if(CLOUD&&auth.currentUser){const u=auth.currentUser;$('#accInfo').innerHTML=`Angemeldet als<br><b>${esc(u.displayName||'Kunde')}</b><br>${esc(u.email)}`;open('accOv');return}
+  showLogin('in');
+};
+$('#lToggle').onclick=e=>{e.preventDefault();setAuthMode(authMode==='in'?'up':'in');$(authMode==='up'?'#lName':'#lUser').focus()};
+$('#lForgot').onclick=e=>{e.preventDefault();forgotPw()};
+$('#accLogout').onclick=()=>au.signOut(auth).then(()=>{close('accOv');toast('Abgemeldet')});
 async function login(){if(CLOUD)return cloudLogin();if($('#lUser').value===creds.u&&hash($('#lPass').value)===creds.h){admin=true;sessionStorage.setItem('mejt_admin','1');setAdminUI();close('loginOv');renderAdminRows();open('adminOv');toast('👋 Willkommen, Admin!');confetti()}else{const b=$('#loginBox');b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');toast('❌ Falsche Zugangsdaten')}}
-$('#doLogin').onclick=login;$('#lPass').onkeydown=e=>{if(e.key==='Enter')login()};
+$('#doLogin').onclick=login;$('#lPass').onkeydown=e=>{if(e.key==='Enter')login()};$('#lUser').onkeydown=e=>{if(e.key==='Enter')$('#lPass').focus()};
 $('#logout').onclick=()=>{if(CLOUD){au.signOut(auth).then(()=>{close('adminOv');toast('Abgemeldet')});return}admin=false;sessionStorage.removeItem('mejt_admin');setAdminUI();close('adminOv');toast('Abgemeldet')};
 $('#saveProd').onclick=saveProd;$('#resetForm').onclick=clearForm;$('#pImgs').oninput=previewImgs;
 $('#saveCred').onclick=()=>{const u=$('#nUser').value.trim(),p=$('#nPass').value;if(!u||p.length<4){toast('⚠️ Benutzername & Passwort (mind. 4 Zeichen)');return}creds={u,h:hash(p)};LS.set('mejt_creds',creds);$('#nUser').value=$('#nPass').value='';toast('🔐 Zugangsdaten gespeichert')};
@@ -776,7 +844,7 @@ $('#resetAll').onclick=async()=>{if(confirm('Alle Produkte durch die Beispielpro
 $('#resetPw').onclick=async()=>{try{await au.sendPasswordResetEmail(auth,auth.currentUser.email);toast('📧 E-Mail zum Ändern des Passworts gesendet')}catch(e){permErr(e)}};
 $('#backTop').onclick=()=>scrollTo({top:0,behavior:'smooth'});$('#toTop').onclick=$('#backTop').onclick;
 addEventListener('scroll',()=>{$('#toTop').classList.toggle('show',scrollY>500);$('#hero').style.backgroundPositionY=scrollY*.3+'px';const s=$('.slide.on .emoji');if(s&&scrollY<500)s.style.marginTop=scrollY*.25+'px'});
-addEventListener('keydown',e=>{if(e.key==='Escape'){['detailOv','loginOv','adminOv','coOv'].forEach(close);closeCart()}});
+addEventListener('keydown',e=>{if(e.key==='Escape'){['detailOv','loginOv','adminOv','coOv','accOv'].forEach(close);closeCart()}});
 
 /* ============ Hero ============ */
 let si=0,st;const slides=$$('.slide');
@@ -793,11 +861,11 @@ setInterval(tick,1000);tick();
 $('#yr').textContent=new Date().getFullYear();
 (async()=>{
   if(CLOUD){
-    $('#loginHint').style.display='none';$('#lUserLbl').textContent='E-Mail';$('#lUser').type='email';
+    $('#loginHint').style.display='none';$('#lUserLbl').textContent='E-Mail';$('#lUser').type='email';$('#lUser').autocomplete='email';$('#lSwitch').style.display='';setAuthMode('in');
     $('#noteLocal').style.display='none';$('#noteCloud').style.display='';
     $('#credLocal').style.display='none';$('#credCloud').style.display='';
     $('#resetAll').textContent='Beispielprodukte hochladen';
-    au.onAuthStateChanged(auth,u=>{admin=!!u;setAdminUI();watchOrders(admin);if(!admin)close('adminOv')});
+    au.onAuthStateChanged(auth,u=>{user=u;admin=false;setAdminUI();if(!u){openAdminAfter=false;close('adminOv');close('accOv')}watchOrders(!!u)});
   }
   if(!CLOUD)orders=LS.get('mejt_orders',[]);
   await loadProducts();started=true;refresh();updateBadges();setAdminUI();renderCart();renderOrders();go(0);setTimeout(()=>$('#loader').classList.add('hide'),900);
