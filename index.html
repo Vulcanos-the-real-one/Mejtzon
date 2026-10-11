@@ -228,10 +228,33 @@ td img{width:46px;height:46px;object-fit:cover;border-radius:5px}
 .adminbar{background:#cc0c39;color:#fff;text-align:center;font-size:13px;padding:5px;display:none}
 .adminbar.on{display:block;animation:slideDown .5s}
 .confetti{position:fixed;top:-20px;width:10px;height:16px;z-index:999;pointer-events:none}
+.tabs{overflow-x:auto;scrollbar-width:none}.tabs button{white-space:nowrap}
+
+/* Bestellungen & Kasse */
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chip{background:#f0f2f2;border-radius:20px;padding:7px 14px;font-size:14px;transition:.2s}
+.chip:hover{background:#e3e6e6;transform:translateY(-2px)}
+.chip.on{background:var(--navy2);color:#fff}
+.chip b{margin-left:6px;background:var(--orange);color:#111;border-radius:10px;padding:0 7px;font-size:12px}
+.ord{border:1px solid #ddd;border-radius:10px;margin-bottom:14px;overflow:hidden;animation:fadeUp .5s both;transition:box-shadow .3s,transform .3s}
+.ord:hover{box-shadow:0 8px 20px rgba(0,0,0,.12);transform:translateY(-2px)}
+.ordh{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;background:#f0f2f2;padding:10px 14px;font-size:13px}
+.ordh b{font-size:15px}
+.st{padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;color:#fff}
+.st.open{background:#e47911;animation:tagpulse 2s infinite}.st.shipped{background:#067d62}.st.cancelled{background:#cc0c39}
+.ordb{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px}
+.ordb h4{font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.oi{display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:13px}
+.oi img{width:38px;height:38px;object-fit:cover;border-radius:5px}
+.orda{display:flex;gap:8px;flex-wrap:wrap;padding:0 14px 14px}
+.chk{display:grid;grid-template-columns:1.2fr 1fr;gap:24px;padding:26px}
+.sum{background:#f7f7f7;border-radius:8px;padding:12px;font-size:14px}
+.sum div{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
+.okc{width:90px;height:90px;border-radius:50%;background:var(--green);color:#fff;font-size:56px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;animation:pop .7s cubic-bezier(.2,1.5,.3,1)}
 
 @media(max-width:760px){
  .detail{grid-template-columns:1fr}.top{flex-wrap:wrap}.search{order:5;flex-basis:100%}
- .hero{height:300px}.row2,.row3{grid-template-columns:1fr}.hbtn span.t{display:none}
+ .hero{height:300px}.row2,.row3{grid-template-columns:1fr}.hbtn span.t{display:none}.ordb,.chk{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -252,6 +275,7 @@ td img{width:46px;height:46px;object-fit:cover;border-radius:5px}
     </form>
     <button class="hbtn" id="accBtn"><span class="t">Hallo,</span><b id="accLabel">Anmelden</b></button>
     <button class="hbtn" id="wishBtn"><span class="t">Merkzettel</span><b>♥ <span id="wishCount">0</span></b></button>
+    <button class="hbtn adminOnly" id="ordBtn" style="display:none"><span class="t">Admin</span><b>📦 <span id="ordCount">0</span> offen</b></button>
     <button class="hbtn cartbtn" id="cartBtn"><span class="ic">🛒</span><span class="badge" id="cartCount">0</span><b class="t">Warenkorb</b></button>
   </div>
   <nav id="nav"></nav>
@@ -306,6 +330,9 @@ td img{width:46px;height:46px;object-fit:cover;border-radius:5px}
   <div class="dfoot"><div class="tot">Summe: <b id="cartTotal">0,00 €</b></div><button class="btn o" style="width:100%" id="checkout">Zur Kasse</button></div>
 </aside>
 
+<!-- Kasse -->
+<div class="ov" id="coOv"><div class="modal" id="coBox"></div></div>
+
 <!-- Login -->
 <div class="ov" id="loginOv"><div class="modal sm" id="loginBox">
   <button class="x" data-close="loginOv">✕</button>
@@ -320,7 +347,7 @@ td img{width:46px;height:46px;object-fit:cover;border-radius:5px}
 <div class="ov" id="adminOv"><div class="modal">
   <button class="x" data-close="adminOv">✕</button>
   <h2 style="padding:20px 20px 0">⚙️ Admin-Bereich</h2>
-  <div class="tabs"><button class="on" data-tab="aList">Produkte</button><button data-tab="aForm" id="tabForm">Produkt hinzufügen</button><button data-tab="aSet">Einstellungen</button></div>
+  <div class="tabs"><button class="on" data-tab="aList">Produkte</button><button data-tab="aForm" id="tabForm">Produkt hinzufügen</button><button data-tab="aOrders" id="tabOrders">📦 Bestellungen</button><button data-tab="aSet">Einstellungen</button></div>
 
   <div class="apane on" id="aList"><div style="overflow:auto"><table><thead><tr><th></th><th>Name</th><th>Kategorie</th><th>Preis</th><th>Lager</th><th></th></tr></thead><tbody id="aRows"></tbody></table></div></div>
 
@@ -344,6 +371,8 @@ td img{width:46px;height:46px;object-fit:cover;border-radius:5px}
     <label style="font-size:14px"><input type="checkbox" id="pPrime" checked> Prime-Versand anzeigen</label>
     <div style="margin-top:14px;display:flex;gap:10px"><button class="btn" id="saveProd">💾 Speichern</button><button class="btn" id="resetForm">Leeren</button></div>
   </div>
+
+  <div class="apane" id="aOrders"><div class="chips" id="ordChips"></div><div id="ordList"></div></div>
 
   <div class="apane" id="aSet">
     <div class="note" id="noteCloud" style="display:none">☁️ <b>Cloud-Modus aktiv:</b> Alle Änderungen werden live in Firebase gespeichert und sind sofort für alle Kunden sichtbar. „Exportieren" dient als Backup.</div>
@@ -412,6 +441,7 @@ const DEFAULTS=[
 ];
 let products=[], cart=LS.get('mejt_cart',{}), wish=LS.get('mejt_wish',[]).map(String), cat='all', query='', sortBy='feat', started=false;
 let admin=!CLOUD&&sessionStorage.getItem('mejt_admin')==='1';
+let orders=[], ordFilter='open', unsubOrders=null, ordFirst=true;
 const hash=s=>{let h=5381;for(const c of s)h=((h<<5)+h+c.charCodeAt(0))>>>0;return h.toString(36)};
 let creds=LS.get('mejt_creds',{u:'admin',h:hash('admin123')});
 
@@ -548,7 +578,7 @@ function showDetail(id){
   $('#dm').onclick=()=>{qty=Math.max(1,qty-1);$('#dq').textContent=qty};
   $('#dp').onclick=()=>{qty=Math.min(p.stock,qty+1);$('#dq').textContent=qty};
   $('#dAdd').onclick=()=>addToCart(id,qty,$('#dMain'));
-  $('#dBuy').onclick=()=>{addToCart(id,qty);close('detailOv');setTimeout(openCart,300)};
+  $('#dBuy').onclick=()=>{addToCart(id,qty);close('detailOv');setTimeout(showCheckout,300)};
 }
 
 /* ============ Admin ============ */
@@ -576,6 +606,71 @@ async function saveProd(){
     clearForm();refresh();renderAdminRows();tab('aList');
   }catch(e){permErr(e)}
 }
+/* ============ Bestellungen ============ */
+const ORD_LABEL={open:'Offen',shipped:'Versendet',cancelled:'Storniert'};
+const ordTime=t=>new Date(t).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'});
+const openOrderCount=()=>orders.filter(o=>o.status==='open').length;
+async function createOrder(order){
+  if(CLOUD){await fs.setDoc(fs.doc(fs.collection(db,'orders')),order)}
+  else{orders.unshift({...order,id:String(Date.now())});LS.set('mejt_orders',orders)}
+}
+async function setOrderStatus(o,status){
+  // Lagerbestand: beim Versenden abziehen, beim Stornieren einer versendeten Bestellung zurückbuchen
+  const delta=(o.status!=='shipped'&&status==='shipped')?-1:(o.status==='shipped'&&status!=='shipped')?1:0;
+  if(!CLOUD){
+    o.status=status;
+    if(delta)(o.items||[]).forEach(it=>{const p=products.find(x=>x.id==it.id);if(p)p.stock=Math.max(0,p.stock+delta*it.qty)});
+    LS.set('mejt_orders',orders);saveProducts();return;
+  }
+  const b=fs.writeBatch(db);
+  b.update(fs.doc(db,'orders',o.id),{status});
+  if(delta)(o.items||[]).forEach(it=>{if(products.some(p=>p.id==it.id))b.update(fs.doc(db,'products',String(it.id)),{stock:fs.increment(delta*it.qty)})});
+  await b.commit();
+}
+async function deleteOrder(o){
+  if(CLOUD)await fs.deleteDoc(fs.doc(db,'orders',o.id));
+  else{orders=orders.filter(x=>x.id!==o.id);LS.set('mejt_orders',orders)}
+}
+function watchOrders(on){
+  if(unsubOrders){unsubOrders();unsubOrders=null}
+  if(!CLOUD)return;
+  if(!on){orders=[];renderOrders();return}
+  ordFirst=true;
+  unsubOrders=fs.onSnapshot(fs.collection(db,'orders'),snap=>{
+    if(!ordFirst)snap.docChanges().forEach(ch=>{if(ch.type==='added'&&!ch.doc.metadata.hasPendingWrites)toast('🔔 Neue Bestellung eingegangen!')});
+    ordFirst=false;
+    orders=snap.docs.map(d=>({...d.data(),id:d.id}));
+    renderOrders();
+  },err=>{console.error(err);toast('⚠️ Bestellungen laden fehlgeschlagen: '+(err.code||err.message))});
+}
+function renderOrders(){
+  const n=openOrderCount();
+  $('#ordCount').textContent=n;$('#tabOrders').textContent='📦 Bestellungen'+(n?` (${n})`:'');
+  const cnt=s=>s==='all'?orders.length:orders.filter(o=>o.status===s).length;
+  $('#ordChips').innerHTML=['open','shipped','cancelled','all'].map(s=>`<button class="chip ${s===ordFilter?'on':''}" data-ofilter="${s}">${s==='all'?'Alle':ORD_LABEL[s]}<b>${cnt(s)}</b></button>`).join('');
+  const l=orders.filter(o=>ordFilter==='all'||o.status===ordFilter).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  $('#ordList').innerHTML=l.length?l.map((o,i)=>{const c=o.customer||{};return `<div class="ord" style="animation-delay:${Math.min(i,8)*.05}s">
+    <div class="ordh"><span><b>${esc(o.orderNo)}</b> · ${ordTime(o.createdAt)}</span><span class="st ${esc(o.status)}">${esc(ORD_LABEL[o.status]||o.status)}</span></div>
+    <div class="ordb">
+      <div><h4>Lieferadresse</h4><div style="font-size:14px;line-height:1.5"><b>${esc(c.name)}</b><br>${esc(c.street)}<br>${esc(c.zip)} ${esc(c.city)}${c.email?`<br>✉ ${esc(c.email)}`:''}${c.phone?`<br>☎ ${esc(c.phone)}`:''}</div>${c.note?`<div class="note" style="margin:8px 0 0">💬 ${esc(c.note)}</div>`:''}</div>
+      <div><h4>Artikel</h4>${(o.items||[]).map(it=>`<div class="oi"><img src="${esc(safeUrl(it.image))}" onerror="this.src='${FALLBACK}'"><span>${esc(it.qty)}× ${esc(it.name)}<br><small style="color:var(--muted)">${eur(it.price)}</small></span></div>`).join('')}<div style="margin-top:8px;font-size:16px"><b>Summe: ${eur(o.total)}</b></div><div style="font-size:12px;color:var(--muted)">${esc(o.pay||'')}</div></div>
+    </div>
+    <div class="orda">
+      ${o.status==='open'?`<button class="btn sm2" data-act="oship" data-id="${esc(o.id)}">✅ Als versendet markieren</button>`:''}
+      ${o.status!=='cancelled'?`<button class="btn red sm2" data-act="ocancel" data-id="${esc(o.id)}">❌ Stornieren</button>`:`<button class="btn sm2" data-act="oreopen" data-id="${esc(o.id)}">↩ Wieder öffnen</button><button class="btn red sm2" data-act="odel" data-id="${esc(o.id)}">🗑 Löschen</button>`}
+      <button class="btn dark sm2" data-act="ocopy" data-id="${esc(o.id)}">📋 Adresse kopieren</button>
+    </div></div>`}).join(''):`<div class="empty" style="padding:30px"><div>📭</div><h3>Keine Bestellungen in dieser Ansicht</h3></div>`;
+}
+function orderAction(act,id){
+  const o=orders.find(x=>x.id===id);if(!o)return;
+  const done=msg=>()=>{renderOrders();toast(msg)};
+  if(act==='oship')setOrderStatus(o,'shipped').then(done('✅ Als versendet markiert')).catch(permErr);
+  if(act==='ocancel'&&confirm(`Bestellung ${o.orderNo} wirklich stornieren?`))setOrderStatus(o,'cancelled').then(done('❌ Bestellung storniert')).catch(permErr);
+  if(act==='oreopen')setOrderStatus(o,'open').then(done('↩ Bestellung wieder geöffnet')).catch(permErr);
+  if(act==='odel'&&confirm(`Bestellung ${o.orderNo} endgültig löschen?`))deleteOrder(o).then(done('🗑 Bestellung gelöscht')).catch(permErr);
+  if(act==='ocopy'){const c=o.customer||{};const t=`${c.name}\n${c.street}\n${c.zip} ${c.city}`;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('📋 Adresse kopiert')).catch(()=>toast('⚠️ Kopieren nicht möglich'))}
+}
+
 function refresh(){renderNav();renderCatCards();renderGrid()}
 
 /* ============ Events ============ */
@@ -584,7 +679,8 @@ document.addEventListener('click',e=>{
   if(e.target.classList.contains('ov')){if(e.target.id==='cartOv')closeCart();else e.target.classList.remove('show')}
   const n=e.target.closest('[data-cat]');if(n){cat=n.dataset.cat;query='';$('#q').value='';refresh();$('#grid').scrollIntoView({behavior:'smooth',block:'start'})}
   const g=e.target.closest('[data-go]');if(g){cat=g.dataset.go;if(cat!=='all'&&!cats().includes(cat))cat='all';refresh();$('#grid').scrollIntoView({behavior:'smooth'})}
-  const t=e.target.closest('[data-tab]');if(t){if(t.dataset.tab==='aForm'&&!$('#pId').value)clearForm();tab(t.dataset.tab);if(t.dataset.tab==='aList')renderAdminRows()}
+  const t=e.target.closest('[data-tab]');if(t){if(t.dataset.tab==='aForm'&&!$('#pId').value)clearForm();tab(t.dataset.tab);if(t.dataset.tab==='aList')renderAdminRows();if(t.dataset.tab==='aOrders')renderOrders()}
+  const oc=e.target.closest('[data-ofilter]');if(oc){ordFilter=oc.dataset.ofilter;renderOrders()}
   const a=e.target.closest('[data-act]');if(!a)return;const id=a.dataset.id,act=a.dataset.act;
   if(act==='open')showDetail(id);
   if(act==='add'){addToCart(id,1,a.closest('.card').querySelector('img'))}
@@ -593,6 +689,7 @@ document.addEventListener('click',e=>{
   if(act==='dec'){cart[id]--;if(cart[id]<=0)delete cart[id];saveCart();updateBadges();renderCart()}
   if(act==='rm'){const el=a.closest('.ci');el.classList.add('out');setTimeout(()=>{delete cart[id];saveCart();updateBadges();renderCart()},330)}
   if(act==='aedit')editProd(id);
+  if(act[0]==='o'&&['oship','ocancel','oreopen','odel','ocopy'].includes(act))orderAction(act,id);
   if(act==='adel'&&confirm('Produkt wirklich löschen?')){dbDelete(id).then(()=>{delete cart[id];saveCart();refresh();renderAdminRows();updateBadges();toast('🗑 Gelöscht')}).catch(permErr)}
 });
 $('#searchForm').onsubmit=e=>{e.preventDefault();query=$('#q').value.trim();cat=$('#searchCat').value;refresh();$('#grid').scrollIntoView({behavior:'smooth'})};
@@ -601,9 +698,71 @@ $('#logo').onclick=()=>{cat='all';query='';$('#q').value='';refresh();scrollTo({
 $('#cartBtn').onclick=openCart;$('#closeCart').onclick=closeCart;
 $('#wishBtn').onclick=()=>{if(!wish.length){toast('Dein Merkzettel ist leer');return}cat='all';query='';toast('♥ Zeige Merkzettel');renderWish()};
 function renderWish(){const keep=products;products=products.filter(p=>wish.includes(p.id));renderGrid();$('#listTitle').textContent='♥ Dein Merkzettel ('+products.length+')';products=keep;$('#grid').scrollIntoView({behavior:'smooth'})}
-$('#checkout').onclick=()=>{if(!cartCount()){toast('Warenkorb ist leer');return}
-  if(!CLOUD){Object.keys(cart).forEach(id=>{const p=products.find(x=>x.id==id);if(p)p.stock=Math.max(0,p.stock-cart[id])});saveProducts()}
-  cart={};saveCart();updateBadges();renderCart();closeCart();renderGrid();confetti();toast('🎉 Danke für deine Bestellung! (Demo)')};
+$('#checkout').onclick=()=>{if(!cartCount()){toast('Warenkorb ist leer');return}closeCart();showCheckout()};
+$('#ordBtn').onclick=()=>{renderAdminRows();tab('aOrders');renderOrders();open('adminOv')};
+function cartItems(){return Object.keys(cart).map(id=>{const p=products.find(x=>x.id==id);return p?{p,q:cart[id]}:null}).filter(Boolean)}
+function showCheckout(){
+  const its=cartItems();if(!its.length){toast('Warenkorb ist leer');return}
+  const tot=its.reduce((a,{p,q})=>a+p.price*q,0),sv=LS.get('mejt_addr',{});
+  $('#coBox').innerHTML=`<button class="x" data-close="coOv">✕</button>
+  <form id="coForm" class="chk" novalidate>
+    <div>
+      <h2 style="margin-bottom:4px">📦 Lieferadresse</h2>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Wohin sollen wir deine Bestellung liefern?</p>
+      <div class="f"><label>Vor- und Nachname *</label><input id="cName" autocomplete="name" maxlength="80"></div>
+      <div class="f"><label>Straße und Hausnummer *</label><input id="cStreet" autocomplete="street-address" maxlength="100"></div>
+      <div class="row2"><div class="f"><label>PLZ *</label><input id="cZip" inputmode="numeric" maxlength="5" autocomplete="postal-code"></div><div class="f"><label>Ort *</label><input id="cCity" autocomplete="address-level2" maxlength="60"></div></div>
+      <div class="row2"><div class="f"><label>E-Mail (optional)</label><input id="cMail" type="email" maxlength="100" autocomplete="email"></div><div class="f"><label>Telefon (optional)</label><input id="cTel" type="tel" maxlength="30" autocomplete="tel"></div></div>
+      <div class="f"><label>Hinweis zur Lieferung (optional)</label><textarea id="cNote" rows="2" maxlength="300"></textarea></div>
+      <label style="font-size:13px;display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="cOk" style="margin-top:3px"> <span>Ich stimme zu, dass meine Angaben zur Abwicklung der Bestellung gespeichert werden. *</span></label>
+    </div>
+    <div>
+      <h2 style="margin-bottom:12px">Deine Bestellung</h2>
+      <div class="sum">${its.map(({p,q})=>`<div><span>${q}× ${esc(p.name)}</span><span>${eur(p.price*q)}</span></div>`).join('')}<hr style="margin:8px 0;border:none;border-top:1px solid #ddd"><div style="font-size:16px"><b>Gesamt</b><b>${eur(tot)}</b></div></div>
+      <p style="font-size:13px;color:var(--muted);margin:10px 0">💶 Zahlungsart: Bezahlung bei Lieferung</p>
+      <button class="btn o" style="width:100%" type="submit" id="cSubmit">Jetzt verbindlich bestellen</button>
+    </div>
+  </form>`;
+  [['cName','name'],['cStreet','street'],['cZip','zip'],['cCity','city'],['cMail','email'],['cTel','phone']].forEach(([i,k])=>{$('#'+i).value=sv[k]||''});
+  $('#coForm').onsubmit=async e=>{
+    e.preventDefault();
+    const v=id=>$('#'+id).value.trim();
+    const cust={name:v('cName'),street:v('cStreet'),zip:v('cZip'),city:v('cCity'),email:v('cMail'),phone:v('cTel'),note:v('cNote')};
+    const bad=(id,msg)=>{const el=$('#'+id);el.focus();el.classList.remove('shake');void el.offsetWidth;el.classList.add('shake');toast('⚠️ '+msg)};
+    if(cust.name.length<2)return bad('cName','Bitte deinen Namen eingeben');
+    if(cust.street.length<3||!/\d/.test(cust.street))return bad('cStreet','Bitte Straße mit Hausnummer eingeben');
+    if(!/^\d{4,5}$/.test(cust.zip))return bad('cZip','Bitte eine gültige PLZ eingeben');
+    if(cust.city.length<2)return bad('cCity','Bitte den Ort eingeben');
+    if(cust.email&&!$('#cMail').checkValidity())return bad('cMail','Bitte eine gültige E-Mail eingeben');
+    if(!$('#cOk').checked)return bad('cOk','Bitte der Speicherung deiner Angaben zustimmen');
+    const cur=cartItems();
+    if(!cur.length){toast('Warenkorb ist leer');close('coOv');return}
+    const over=cur.find(({p,q})=>q>p.stock);
+    if(over){toast(`⚠️ „${over.p.name}" ist nicht mehr in dieser Menge verfügbar`);return}
+    const total=+cur.reduce((a,{p,q})=>a+p.price*q,0).toFixed(2);
+    const order={orderNo:'MEJT-'+Date.now().toString(36).toUpperCase().slice(-5)+Math.random().toString(36).slice(2,5).toUpperCase(),
+      items:cur.map(({p,q})=>({id:String(p.id),name:p.name,price:p.price,qty:q,image:p.images[0]||''})),
+      total,customer:cust,status:'open',createdAt:Date.now(),pay:'Bezahlung bei Lieferung'};
+    const btn=$('#cSubmit');btn.disabled=true;btn.textContent='Wird gesendet …';
+    try{
+      await createOrder(order);
+      LS.set('mejt_addr',{name:cust.name,street:cust.street,zip:cust.zip,city:cust.city,email:cust.email,phone:cust.phone});
+      cart={};saveCart();updateBadges();renderCart();showOrderDone(order);confetti();
+    }catch(err){
+      console.error(err);btn.disabled=false;btn.textContent='Jetzt verbindlich bestellen';
+      toast('❌ Bestellung konnte nicht gesendet werden. Bitte versuche es später erneut.');
+    }
+  };
+  open('coOv');setTimeout(()=>$('#cName').focus(),150);
+}
+function showOrderDone(o){
+  const c=o.customer;
+  $('#coBox').innerHTML=`<button class="x" data-close="coOv">✕</button><div style="padding:34px 26px;text-align:center">
+    <div class="okc">✓</div><h2>Danke für deine Bestellung, ${esc(c.name.split(' ')[0])}!</h2>
+    <p style="margin:8px 0;color:var(--muted)">Bestellnummer: <b style="color:var(--text)">${esc(o.orderNo)}</b></p>
+    <div class="sum" style="text-align:left;max-width:420px;margin:16px auto"><div style="display:block"><b>Lieferung an:</b><br>${esc(c.name)}<br>${esc(c.street)}<br>${esc(c.zip)} ${esc(c.city)}</div><hr style="margin:8px 0;border:none;border-top:1px solid #ddd"><div><span>Gesamt (Bezahlung bei Lieferung)</span><b>${eur(o.total)}</b></div></div>
+    <button class="btn o" data-close="coOv">Weiter einkaufen</button></div>`;
+}
 $('#accBtn').onclick=()=>{if(admin){renderAdminRows();open('adminOv')}else{$('#lUser').value='';$('#lPass').value='';open('loginOv');setTimeout(()=>$('#lUser').focus(),100)}};
 async function login(){if(CLOUD)return cloudLogin();if($('#lUser').value===creds.u&&hash($('#lPass').value)===creds.h){admin=true;sessionStorage.setItem('mejt_admin','1');setAdminUI();close('loginOv');renderAdminRows();open('adminOv');toast('👋 Willkommen, Admin!');confetti()}else{const b=$('#loginBox');b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');toast('❌ Falsche Zugangsdaten')}}
 $('#doLogin').onclick=login;$('#lPass').onkeydown=e=>{if(e.key==='Enter')login()};
@@ -617,7 +776,7 @@ $('#resetAll').onclick=async()=>{if(confirm('Alle Produkte durch die Beispielpro
 $('#resetPw').onclick=async()=>{try{await au.sendPasswordResetEmail(auth,auth.currentUser.email);toast('📧 E-Mail zum Ändern des Passworts gesendet')}catch(e){permErr(e)}};
 $('#backTop').onclick=()=>scrollTo({top:0,behavior:'smooth'});$('#toTop').onclick=$('#backTop').onclick;
 addEventListener('scroll',()=>{$('#toTop').classList.toggle('show',scrollY>500);$('#hero').style.backgroundPositionY=scrollY*.3+'px';const s=$('.slide.on .emoji');if(s&&scrollY<500)s.style.marginTop=scrollY*.25+'px'});
-addEventListener('keydown',e=>{if(e.key==='Escape'){['detailOv','loginOv','adminOv'].forEach(close);closeCart()}});
+addEventListener('keydown',e=>{if(e.key==='Escape'){['detailOv','loginOv','adminOv','coOv'].forEach(close);closeCart()}});
 
 /* ============ Hero ============ */
 let si=0,st;const slides=$$('.slide');
@@ -638,9 +797,10 @@ $('#yr').textContent=new Date().getFullYear();
     $('#noteLocal').style.display='none';$('#noteCloud').style.display='';
     $('#credLocal').style.display='none';$('#credCloud').style.display='';
     $('#resetAll').textContent='Beispielprodukte hochladen';
-    au.onAuthStateChanged(auth,u=>{admin=!!u;setAdminUI();if(!admin)close('adminOv')});
+    au.onAuthStateChanged(auth,u=>{admin=!!u;setAdminUI();watchOrders(admin);if(!admin)close('adminOv')});
   }
-  await loadProducts();started=true;refresh();updateBadges();setAdminUI();renderCart();go(0);setTimeout(()=>$('#loader').classList.add('hide'),900);
+  if(!CLOUD)orders=LS.get('mejt_orders',[]);
+  await loadProducts();started=true;refresh();updateBadges();setAdminUI();renderCart();renderOrders();go(0);setTimeout(()=>$('#loader').classList.add('hide'),900);
 })();
 </script>
 </body>
